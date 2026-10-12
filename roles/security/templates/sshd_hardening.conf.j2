@@ -4,6 +4,7 @@
 Port {{ ssh_port }}
 PermitRootLogin {{ security_ssh_permit_root_login }}
 PasswordAuthentication {{ security_ssh_password_authentication }}
+PubkeyAuthentication {{ security_ssh_pubkey_authentication }}
 PermitEmptyPasswords {{ security_ssh_permit_empty_passwords }}
 MaxAuthTries {{ security_ssh_max_auth_tries }}
 ClientAliveInterval {{ security_ssh_client_alive_interval }}

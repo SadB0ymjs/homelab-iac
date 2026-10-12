@@ -16,6 +16,9 @@ security_ssh_permit_root_login: "yes"
 # 允许密码认证（双通道：密码 + 密钥都能登）
 security_ssh_password_authentication: "yes"
 
+# 显式开启公钥认证（防止商家镜像/发行版默认片段禁用导致密钥永远走不通）
+security_ssh_pubkey_authentication: "yes"
+
 # 禁止空密码
 security_ssh_permit_empty_passwords: "no"
 
