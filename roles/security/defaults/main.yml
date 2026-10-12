@@ -2,23 +2,26 @@
 # security 角色可调参数
 # 优先级最低，会被 group_vars/all.yml 或 playbook 中的同名变量覆盖
 
-# ==================== sshd 加固 ====================
-# SSH 监听端口（inventory 里 ansible_port=10012，服务器本身已是这个端口，
-# 保持一致，避免 playbook 跑完后连不上）
+# ==================== sshd 加固（宽松策略：密码+密钥双通道）====================
+# 应用户要求放宽：纯密钥策略会把密码救援通道锁死（曾导致连不上），
+# homelab 保留密码登录方便救援，暴力破解由 fail2ban 兜底。
+# 要收紧改回：password "no" + root "prohibit-password"
+
+# SSH 监听端口（sshd 内部监听端口；NAT 外部端口由 inventory 的 ansible_port 管）
 ssh_port: 22
 
-# 禁止 root 直接登录（prohibit-password：root 仅可用密钥登录，比 no 更稳妥，
-# 万一部署用户配置失败还有 root 密钥这条后路）
-security_ssh_permit_root_login: "prohibit-password"
+# root 允许密码登录（双通道；生产环境建议 prohibit-password）
+security_ssh_permit_root_login: "yes"
 
-# 禁止密码认证，只允许密钥登录
-security_ssh_password_authentication: "no"
+# 允许密码认证（双通道：密码 + 密钥都能登）
+security_ssh_password_authentication: "yes"
 
 # 禁止空密码
 security_ssh_permit_empty_passwords: "no"
 
-# 最多允许 3 次认证尝试
-security_ssh_max_auth_tries: 3
+# 认证尝试次数：回默认 6（之前 3 太紧，客户端带多把密钥轮试极易触发
+# Too many authentication failures）
+security_ssh_max_auth_tries: 6
 
 # 空闲会话 300 秒无操作自动断开（server 每 60 秒发一次探测）
 security_ssh_client_alive_interval: 300
