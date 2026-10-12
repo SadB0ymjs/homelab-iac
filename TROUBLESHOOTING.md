@@ -17,6 +17,7 @@
 | 6 | 2026-10-12 | 密钥推了但 root 始终免不了密 | 公钥只推 ops，ansible_user=root | ✅ 已解决 |
 | 7 | 2026-10-12 | assert 报 Conditional is marked as unsafe | jinja 套 jinja 嵌套 | ✅ 已解决 |
 | 8 | 2026-10-12 | 指定密钥仍要密码（免密终局） | sshd 的 PubkeyAuthentication 被外部配置关闭 | ✅ 已解决 |
+| 9 | 2026-10-12 | known_hosts 旧主机指纹残留 | NAT 换入口后同 IP:port 的主机密钥变了 | ✅ 已解决 |
 
 ---
 
@@ -93,6 +94,17 @@
 - **解决**：加固模板显式写入 `PubkeyAuthentication yes`。关键在位置：片段以 `00-` 前缀放在 sshd_config.d/ 最先加载、优先级最高，任何别处的关闭都会被它压住。playbook 一跑自动收敛。
 - **预防**：对"期望状态"的每一项都要显式声明，不能依赖默认值——默认值可能被镜像/上游/残留配置改掉。这正是 IaC 的核心价值：**发现的每一处漂移都固化成代码，下次自动纠正**。
 - **提交**：`2a8a5c9`
+
+## 9. known_hosts 旧主机指纹残留
+
+- **现象**：NAT 换入口地址后，ssh/Ansible 连接时警告主机密钥变更，或行为异常（本机 known_hosts 里同一个 `[103.236.70.77]:10011` 存了 3 条旧记录，line 6/7/8）。
+- **排查**：`ssh-keygen -f "/root/.ssh/known_hosts" -R "[103.236.70.77]:10011"` 输出显示该条目出现 3 次——同一 host:port 之前反复写入过不同指纹（NAT 出口漂移/重装系统都会造成"地址没变、后面的机器换了"，每次连的都是不同的 sshd，指纹自然不同）。
+- **根因**：NAT 环境下 `[IP]:port` 这个标识对应的**实际机器会变**（换转发目标、机器重装），known_hosts 里按标识缓存的旧指纹与新机器不匹配。本项目 inventory 配了 `StrictHostKeyChecking=no`（ ansible.cfg 同样配置），所以没有直接报 `REMOTE HOST IDENTIFICATION HAS CHANGED` 被拒连，但旧条目属于脏数据，且若哪天去掉 no 配置会立刻炸。
+- **解决**：`ssh-keygen -f "/root/.ssh/known_hosts" -R "[103.236.70.77]:10011"` 清掉旧条目（自动备份为 known_hosts.old），下次连接写入新机器的真实指纹。之后 playbook 正常全绿。
+- **预防**：
+  - NAT 漂移/目标机重装后，顺手 `-R` 清旧指纹再连（或直接删 known_hosts 对应行）
+  - `[非默认端口]` 的条目在 known_hosts 里**必须带方括号**：`[ip]:port`，`-R` 时也要带，不带匹配不到
+  - 生产环境别长期用 `StrictHostKeyChecking=no`，它是把这类警告静音的掩盖型配置；homelab 图省事可用，但要知道代价是放弃了主机身份校验
 
 ---
 
