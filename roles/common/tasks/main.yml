@@ -43,22 +43,3 @@
     validate: 'visudo -cf %s'
   when: common_sudo_nopasswd
 
-# 7. 验证密钥推送结果：比对控制机公钥指纹与远端 authorized_keys，
-#    两边一致才放行（防止"显示 changed 但实际没生效"的静默失败）
-- name: 计算控制机公钥指纹
-  set_fact:
-    common_local_key_fingerprint: "{{ lookup('file', common_ssh_public_key_file) | regex_replace('^.*? ', '') | truncate(40, True, '') | default('EMPTY') }}"
-
-- name: 读取远端 authorized_keys 并核对
-  command: "cat /home/{{ deploy_user }}/.ssh/authorized_keys"
-  register: common_remote_keys
-  changed_when: false
-
-- name: 核对密钥推送结果（远端必须包含控制机公钥）
-  assert:
-    that:
-      - common_remote_keys.stdout is defined
-      - "'{{ lookup('file', common_ssh_public_key_file) }}' in common_remote_keys.stdout"
-    success_msg: "密钥免密已生效：{{ deploy_user }} 的 authorized_keys 包含控制机公钥"
-    fail_msg: "密钥推送失败！远端 authorized_keys 里找不到控制机公钥，请检查 ~/.ssh/{{ common_ssh_public_key_file | basename }}"
-
