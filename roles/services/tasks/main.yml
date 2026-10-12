@@ -41,6 +41,23 @@
 - name: 刷新 handlers（首次部署立即拉起 TeamSpeak）
   meta: flush_handlers
 
+# 1.5 自愈兜底：容器不存在时直接补一次 up -d。
+#      场景：上次 up -d 死于镜像拉取 502 等瞬时故障 → 容器没建成；
+#      重跑时 compose 文件未变不触发 handler → 永远不会再部署 → 死锁。
+#      up -d 本身幂等（容器在跑时空操作），无条件兜底不破坏幂等设计。
+- name: 检查 TeamSpeak 容器是否存在
+  command: "docker inspect -f '{% raw %}{{.State.Status}}{% endraw %}' teamspeak"
+  register: ts_container_state
+  changed_when: false
+  failed_when: false
+  when: "'teamspeak' in services_enabled"
+
+- name: 容器缺失时自愈部署
+  command: "docker compose -f {{ services_teamspeak_dir }}/docker-compose.yml up -d"
+  args:
+    chdir: "{{ services_teamspeak_dir }}"
+  when: "'teamspeak' in services_enabled and ts_container_state.rc != 0"
+
 # ============ 2. 验证 ============
 # TS3 是 UDP 语音服务，没有 HTTP 端点，健康检查用容器运行状态代替
 - name: 等待 TeamSpeak 容器运行
