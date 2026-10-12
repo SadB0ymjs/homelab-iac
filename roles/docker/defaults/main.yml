@@ -4,13 +4,14 @@
 
 # ---- apt 软件源（国内阿里云镜像站）----
 # Docker 官方 GPG key 的镜像地址
-docker_apt_gpg_key_url: "https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg"
+# 发行版自动适配：Ubuntu 解析为 ubuntu、Debian 解析为 debian
+docker_apt_gpg_key_url: "https://mirrors.aliyun.com/docker-ce/linux/{{ ansible_distribution | lower }}/gpg"
 
 # Docker CE apt 软件源（阿里云镜像站），{{ ansible_distribution_release }} 会替换成
-# focal / jammy 等 Ubuntu 版本代号
+# focal / jammy（Ubuntu）或 bullseye / bookworm（Debian）等版本代号
 docker_apt_repository: >
   deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
-  https://mirrors.aliyun.com/docker-ce/linux/ubuntu
+  https://mirrors.aliyun.com/docker-ce/linux/{{ ansible_distribution | lower }}
   {{ ansible_distribution_release }} stable
 
 # GPG key 存放路径（apt 源的 signed-by 指向这里，.asc 为 ASCII 格式，新版 apt 直接支持）
