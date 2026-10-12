@@ -21,6 +21,7 @@
 | 10 | 2026-10-12 | 重装后 REMOTE HOST IDENTIFICATION HAS CHANGED | 重装=新主机密钥，known_hosts 旧指纹冲突（#9 的真实触发） | ✅ 已解决 |
 | 11 | 2026-10-12 | 镜像拉取 502 Bad Gateway | 公共加速器 daocloud 高峰过载 | ✅ 已解决（多加速器冗余） |
 | 12 | 2026-10-12 | Load key "/dev/null": bad permissions | hosts.ini 曾加 `-i /dev/null` 纯密码 hack，公钥恢复后成路障 | ✅ 已解决 |
+| 13 | 2026-10-12 | 容器 no such object，等待任务 15 次全空转 | handler 幂等设计遇「上次 up -d 失败」成死锁 | ✅ 已解决（自愈兜底） |
 
 ---
 
@@ -139,6 +140,16 @@
 - **根因**：`-i /dev/null` 是一个知名 hack——强制 ssh 不加载任何真实密钥、做纯净密码认证（之前排查密码连接问题时写入）。临时 hack 没有恢复，等 B 机公钥通道修复后，它反而变成"只许用空钥匙"的路障：`IdentityFile=/dev/null` + `IdentitiesOnly=yes` 组合下任何真密钥都不被端出。
 - **解决**：hosts.ini 的 `ansible_ssh_common_args` 删掉 `-o IdentityFile=/dev/null`，保留 `-o IdentitiesOnly=yes`（配合 `ansible_ssh_private_key_file` 仍防多钥匙轮询）。
 - **预防**：临时 hack/排查用的配置改动，**当场加 TODO 注释标记用途与恢复条件**，用完即删；"排查时加的"和"常态配置"混在一起，后面的人（包括自己）无法分辨哪些是故意为之。另外 `-vvv` 是连接问题的终极武器——直接看 Ansible 拼出的完整 ssh 命令行，比猜一百次都快。
+
+---
+
+## 13. 容器 no such object，等待任务 15 次重试全空转
+
+- **现象**：`changed=2` 一轮跑完后，「等待 TeamSpeak 容器运行」重试 15 次全部 `error: no such object: teamspeak`。
+- **排查**：`changed=2` 里没有「部署 TeamSpeak」——compose 文件本轮无变化，notify 的 handler 不触发，`up -d` 没执行。而容器缺失是因为**上一轮**的 up -d 死于镜像 502（#11）。
+- **根因**：幂等设计只覆盖了「文件变→部署」，没覆盖「上次部署失败→重试」：失败后文件不变 → handler 永不触发 → 容器永远不部署 → 死锁。这是声明式幂等的经典盲区：**notify 模型的前提是「变更已成功应用」，它不追踪失败**。
+- **解决**：新增自愈兜底任务：`docker inspect` 检查容器存在性（`failed_when: false`），rc != 0（不存在）时无条件补一次 `up -d`。up -d 本身幂等（容器在跑时空操作），不破坏原设计。
+- **预防**：所有「notify handler 驱动部署」的模式，都要问一句"handler 失败后重跑会怎样"——答案是 notify 不重发（文件没变）。要么加存在性自愈，要么把 up -d 从 handler 里拿出来做成幂等任务。失败状态也是状态，幂等设计必须把「上一次失败」当作一种需要收敛的漂移。
 
 ---
 
