@@ -1,0 +1,11 @@
+---
+# sshd 配置片段变更后，先验证语法再重启，语法错误时不会动正在运行的 sshd
+- name: 验证并重启 sshd
+  shell: "sshd -t && systemctl restart ssh"
+  when: ansible_facts['os_family'] == 'Debian'
+
+# fail2ban 配置变更后重启服务
+- name: 重启 fail2ban
+  service:
+    name: fail2ban
+    state: restarted

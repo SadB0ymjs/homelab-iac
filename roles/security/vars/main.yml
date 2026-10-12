@@ -1,0 +1,16 @@
+---
+# security 角色内部常量
+# 优先级高于 defaults，不建议在外部覆盖
+
+# sshd 配置片段目录：Ubuntu 的 /etc/ssh/sshd_config 默认有一行
+# "Include /etc/ssh/sshd_config.d/*.conf"，写到这里且按字母序后加载，
+# 会覆盖主配置文件里的同名指令（如发行版默认的 PermitRootLogin yes）
+security_sshd_config_dir: /etc/ssh/sshd_config.d
+security_sshd_config_snippet: /etc/ssh/sshd_config.d/00-homelab-hardening.conf
+
+# fail2ban jail 配置路径（jail.local 优先级高于 jail.conf，不会被包升级覆盖）
+security_fail2ban_jail_path: /etc/fail2ban/jail.local
+
+# unattended-upgrades 配置文件路径
+security_auto_upgrade_conf: /etc/apt/apt.conf.d/50unattended-upgrades
+security_auto_upgrade_periodic_conf: /etc/apt/apt.conf.d/20auto-upgrades

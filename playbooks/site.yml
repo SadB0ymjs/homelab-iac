@@ -1,0 +1,16 @@
+---
+# 主入口：裸机 → 初始化 + 加固 + Docker + 服务，一条命令全跑通
+# 用法：ansible-playbook -i inventory/hosts.ini playbooks/site.yml
+#
+# 角色顺序有依赖，不可随意调整：
+#   common   建部署用户 + sudo 免密（后面所有角色的 become 依赖它）
+#   security sshd 加固（禁密码登录依赖 common 已配好密钥免密）
+#   docker   安装引擎（services 的前置）
+#   services compose 拉起 TeamSpeak（依赖 docker + 部署用户）
+- hosts: homelab
+  become: yes
+  roles:
+    - common
+    - security
+    - docker
+    - services

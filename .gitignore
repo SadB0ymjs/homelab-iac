@@ -1,0 +1,18 @@
+# 敏感信息：inventory 含公网 IP/端口/用户，不进仓库（用 hosts.ini.example 模板代替）
+inventory/hosts.ini
+host_vars/
+group_vars/vault.yml
+*.vault
+
+# Drone OAuth 凭据（第二遍部署时才写，提交前先挪走或用 vault）
+group_vars/secrets.yml
+
+# 运行时产物
+*.retry
+*.log
+__pycache__/
+.validate_tmp.py
+
+# 编辑器
+.vscode/
+.idea/

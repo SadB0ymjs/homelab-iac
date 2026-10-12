@@ -1,0 +1,88 @@
+---
+# security 角色：sshd 加固 + fail2ban + 自动安全更新
+# 不启用 ufw 防火墙：homelab 场景下后续服务多、端口不固定，全端口开放换便利，
+# 攻击面由 fail2ban（SSH 防爆破）+ 云厂商安全组兜底。
+#
+# 执行顺序：安装 → fail2ban → 自动更新 → 最后 sshd 加固
+# （sshd 放最后：改完验证语法再重启，失败即中止，不影响正在运行的 sshd）
+
+# ============ 1. 安装安全组件 ============
+- name: 安装安全加固软件包
+  apt:
+    name:
+      - fail2ban
+      - unattended-upgrades
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+
+# ============ 2. fail2ban ============
+- name: 配置 fail2ban（SSH 防爆破）
+  template:
+    src: jail.local.j2
+    dest: "{{ security_fail2ban_jail_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: 重启 fail2ban
+
+- name: 启动并启用 fail2ban
+  service:
+    name: fail2ban
+    state: started
+    enabled: yes
+
+# ============ 3. 自动安全更新 ============
+- name: 配置 unattended-upgrades 策略
+  template:
+    src: 50unattended-upgrades.j2
+    dest: "{{ security_auto_upgrade_conf }}"
+    owner: root
+    group: root
+    mode: '0644'
+  when: security_auto_upgrade_enabled
+
+- name: 启用每日自动更新定时器
+  template:
+    src: 20auto-upgrades.j2
+    dest: "{{ security_auto_upgrade_periodic_conf }}"
+    owner: root
+    group: root
+    mode: '0644'
+  when: security_auto_upgrade_enabled
+
+- name: 启动 unattended-upgrades 定时器
+  systemd:
+    name: apt-daily-upgrade.timer
+    state: started
+    enabled: yes
+  when: security_auto_upgrade_enabled
+
+# ============ 4. sshd 加固（放最后） ============
+- name: 写入 sshd 加固配置片段
+  template:
+    src: sshd_hardening.conf.j2
+    dest: "{{ security_sshd_config_snippet }}"
+    owner: root
+    group: root
+    mode: '0600'
+  notify: 验证并重启 sshd
+
+# 4.2 flush 确保 sshd 在本角色内完成验证+重启，若 sshd -t 失败立刻中止，
+#     不让后续角色在「sshd 配置错误」的状态下继续跑
+- name: 刷新 handlers（应用 sshd 配置）
+  meta: flush_handlers
+
+# ============ 5. 验证 ============
+- name: 验证 sshd 配置语法
+  command: sshd -t
+  changed_when: false
+
+- name: 验证 fail2ban 运行状态
+  command: fail2ban-client status sshd
+  changed_when: false
+  register: fail2ban_status
+
+- name: 显示 fail2ban sshd jail 状态
+  debug:
+    msg: "{{ fail2ban_status.stdout_lines }}"

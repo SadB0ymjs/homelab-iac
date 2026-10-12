@@ -1,0 +1,12 @@
+{
+  "registry-mirrors": [
+{% for mirror in docker_registry_mirrors %}
+    "{{ mirror }}"{{ "," if not loop.last else "" }}
+{% endfor %}
+  ],
+  "log-driver": "{{ docker_log_driver }}",
+  "log-opts": {
+    "max-size": "{{ docker_log_max_size }}",
+    "max-file": "{{ docker_log_max_file }}"
+  }
+}

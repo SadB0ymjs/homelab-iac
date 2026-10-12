@@ -1,0 +1,11 @@
+---
+# daemon.json 变更后重启 docker 才能生效（镜像加速器、日志限制等）
+- name: 重启 docker
+  service:
+    name: "{{ docker_service_name }}"
+    state: restarted
+
+# systemd 单元目录变更后需要先 reload 再重启
+- name: 重载 systemd 守护进程
+  systemd:
+    daemon_reload: yes

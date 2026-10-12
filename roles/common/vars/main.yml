@@ -1,0 +1,6 @@
+---
+# common 角色内部常量
+# 优先级高于 defaults，不建议在外部覆盖
+
+# sudoers 片段存放目录（/etc/sudoers.d）
+common_sudoers_dir: /etc/sudoers.d

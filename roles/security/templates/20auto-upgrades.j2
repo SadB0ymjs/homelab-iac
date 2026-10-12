@@ -1,0 +1,5 @@
+// {{ ansible_managed }}
+// 定时器开关：每日检查更新、每 15 分钟下载更新
+APT::Periodic::Update-Package-Lists "1";
+APT::Periodic::Unattended-Upgrade "1";
+APT::Periodic::Download-Upgradeable-Packages "1";

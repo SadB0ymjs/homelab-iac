@@ -1,0 +1,20 @@
+// {{ ansible_managed }}
+// unattended-upgrades：自动安全更新配置（此文件是 JS 风格注释，apt 支持）
+Unattended-Upgrade::Allowed-Origins {
+    "${distro_id}:${distro_codename}";
+    "${distro_id}:${distro_codename}-security";
+    "${distro_id}ESMApps:${distro_codename}-apps-security";
+    "${distro_id}ESM:${distro_codename}-infra-security";
+};
+
+// 移除不再需要的依赖包
+Unattended-Upgrade::Remove-Unused-Dependencies "{{ 'true' if security_auto_upgrade_autoremove else 'false' }}";
+
+// 更新后若需重启，是否自动重启
+Unattended-Upgrade::Automatic-Reboot "{{ 'true' if security_auto_upgrade_automatic_reboot else 'false' }}";
+
+// 自动重启的执行时间
+Unattended-Upgrade::Automatic-Reboot-Time "{{ security_auto_upgrade_reboot_time }}";
+
+// 更新详情发送邮件（本地无邮件服务，保持关闭）
+Unattended-Upgrade::Mail "false";

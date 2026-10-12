@@ -1,0 +1,8 @@
+---
+# common 角色本身不改动 sshd 配置，所以这里没有任务会触发 handler。
+# 保留一个标准的 sshd 重启 handler：handler 在同一个 play 内按名字共享，
+# security 角色修改 sshd 配置后可以直接 notify: 重启 sshd，避免两个角色重复定义。
+- name: 重启 sshd
+  service:
+    name: ssh
+    state: restarted

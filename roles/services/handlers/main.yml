@@ -1,0 +1,7 @@
+---
+# compose 文件内容有变更才执行 up -d：重复跑 playbook 不会无脑重建容器，
+# 无变更时 up -d 也只是空操作，双重保证幂等
+- name: 部署 TeamSpeak
+  command: "docker compose -f {{ services_teamspeak_dir }}/docker-compose.yml up -d"
+  args:
+    chdir: "{{ services_teamspeak_dir }}"

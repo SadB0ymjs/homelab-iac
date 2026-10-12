@@ -1,0 +1,70 @@
+---
+# services 角色：用 Docker Compose 声明式部署服务（当前：TeamSpeak 3）
+# Ansible 只负责：建目录 → 渲染 compose 模板 → 通知 handler 拉起/更新容器；
+# 运行期生命周期（崩溃重启、开机自启）由 Docker restart: always 接管。
+# 幂等性：compose 文件无变化时不会触发 up -d。
+
+# ============ 1. TeamSpeak ============
+# 1.1 建项目目录（compose 文件 + data 数据卷都放这里）
+- name: 创建 TeamSpeak 项目目录
+  file:
+    path: "{{ services_teamspeak_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  when: "'teamspeak' in services_enabled"
+
+# 1.2 渲染 compose 文件（变量：镜像 tag、端口；内容变化时 notify 拉起）
+- name: 渲染 TeamSpeak docker-compose.yml
+  template:
+    src: teamspeak-compose.yml.j2
+    dest: "{{ services_teamspeak_dir }}/docker-compose.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  when: "'teamspeak' in services_enabled"
+  notify: 部署 TeamSpeak
+
+# 1.3 建数据卷目录并放开权限（官方镜像内进程以 UID 1000 运行，目录属主需匹配，
+#      否则首次启动写 SQLite/license 文件会报 Permission denied）
+- name: 创建 TeamSpeak 数据目录
+  file:
+    path: "{{ services_teamspeak_dir }}/{{ teamspeak_data_dir }}"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: '0700'
+  when: "'teamspeak' in services_enabled"
+
+# 1.4 flush 让「首次部署」在本角色内就完成拉起，后面的验证才有东西可查
+- name: 刷新 handlers（首次部署立即拉起 TeamSpeak）
+  meta: flush_handlers
+
+# ============ 2. 验证 ============
+# TS3 是 UDP 语音服务，没有 HTTP 端点，健康检查用容器运行状态代替
+- name: 等待 TeamSpeak 容器运行
+  command: "docker inspect -f '{% raw %}{{.State.Status}}{% endraw %}' teamspeak"
+  register: ts_status
+  until: ts_status.stdout == 'running'
+  retries: 15
+  delay: 4
+  changed_when: false
+  when: "'teamspeak' in services_enabled"
+
+# 管理员令牌（privilege key）只在首次启动日志里打印一次，捞出来给用户
+- name: 从首次启动日志提取 privilege key
+  shell: "docker logs teamspeak 2>&1 | grep -o 'token=[a-zA-Z0-9+/=]*' | head -1"
+  register: ts_privilege_key
+  changed_when: false
+  failed_when: false
+  when: "'teamspeak' in services_enabled"
+
+- name: 部署汇总
+  debug:
+    msg:
+      - "TeamSpeak 服务器已部署：{{ inventory_hostname }}"
+      - "语音端口（UDP）: {{ teamspeak_voice_port }}  | 查询（TCP）: {{ teamspeak_query_port }}  | 文件传输（TCP）: {{ teamspeak_filetransfer_port }}"
+      - "客户端连接地址填服务器 IP 即可；{{ ts_privilege_key.stdout | default('日志中未找到 privilege key（可能此前已初始化过，见 data/ 目录）') }}"
+      - "数据目录：{{ services_teamspeak_dir }}/{{ teamspeak_data_dir }}（备份它 = 备份整个 TS 服务器状态）"
+  when: "'teamspeak' in services_enabled"

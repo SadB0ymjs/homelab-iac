@@ -1,0 +1,15 @@
+---
+# 全局变量：inventory 下所有主机、所有角色共享
+# 服务器清单见 inventory/hosts.ini
+
+# 部署用户：common 角色负责创建，docker 角色会把它加入 docker 组
+deploy_user: ops
+
+# 系统时区：common 角色据此设置
+timezone: Asia/Shanghai
+
+# SSH 端口（sshd 内部监听端口，全局默认 22）：security 角色据此配置 sshd 与 fail2ban
+# 注意与 ansible_port（inventory 里的外部连接端口）区分：
+#   - NAT 机外部 10012 → 内部 22 的转发：inventory 写 ansible_port=10012 即可，本变量保持 22 不动
+#   - sshd 真监听非标端口的少数机器：建 host_vars/<主机名>.yml 覆盖本值
+ssh_port: 22

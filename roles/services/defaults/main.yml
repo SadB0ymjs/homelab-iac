@@ -1,0 +1,29 @@
+---
+# services 角色可调参数
+# 优先级最低，会被 group_vars/all.yml 或 playbook 中的同名变量覆盖
+
+# ---- 目录结构 ----
+# 所有服务统一根目录：备份这一个目录 = 备份全部服务状态（数据卷都在这下面）
+services_base_dir: /opt/services
+
+# 要部署的服务列表（后续加新服务：模板 + 列表加一项即可）
+services_enabled:
+  - teamspeak
+
+# ==================== TeamSpeak 3 ====================
+# 镜像锁定具体 tag（不跟 latest，保证「删库重装一条命令恢复」可复现）
+teamspeak_image: "teamspeak:3.13"
+
+# 数据持久化目录（相对 services_base_dir）
+teamspeak_data_dir: "teamspeak/data"
+
+# ---- 端口（TS3 标准端口组）----
+# 语音 UDP 9987（客户端连接用）；ServerQuery TCP 10011（管理）；
+# 文件传输 TCP 30033。均已映射到宿主机相同端口。
+teamspeak_voice_port: 9987          # UDP
+teamspeak_query_port: 10011         # TCP
+teamspeak_filetransfer_port: 30033  # TCP
+
+# TS3 服务器首次启动会在日志里打印 privilege key（管理员令牌），
+# 首次登录客户端后用它获取 serveradmin 权限
+teamspeak_whitelist_ip: ""         # query_ip_whitelist，留空则不写该配置

@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+# fail2ban 主配置：SSH 防爆破
+[DEFAULT]
+# SSH 登录失败 {{ security_fail2ban_max_retry }} 次后封禁 {{ security_fail2ban_ban_time }}
+maxretry = {{ security_fail2ban_max_retry }}
+findtime = {{ security_fail2ban_find_time }}
+bantime = {{ security_fail2ban_ban_time }}
+
+# 封禁动作（默认 iptables，不依赖 ufw）
+banaction = {{ security_fail2ban_ban_action }}
+
+# 白名单：这些地址永远不会被封
+ignoreip = {{ security_fail2ban_ignore_ip | join(', ') }}
+
+[sshd]
+enabled = true
+port = {{ ssh_port }}
+backend = systemd

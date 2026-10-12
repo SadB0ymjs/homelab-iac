@@ -1,0 +1,8 @@
+# 复制为 hosts.ini 并填入你的服务器信息（hosts.ini 已被 .gitignore 排除，不会提交）
+# 支持多台机器：一台一行，NAT 机用 ansible_port 指定外部端口
+[homelab]
+homelab-server ansible_host=<你的服务器IP> ansible_user=root ansible_port=22
+
+[homelab:vars]
+ansible_ssh_private_key_file=~/.ssh/id_rsa
+ansible_ssh_common_args="-o StrictHostKeyChecking=no"

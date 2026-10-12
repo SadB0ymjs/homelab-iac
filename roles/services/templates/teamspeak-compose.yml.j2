@@ -1,0 +1,18 @@
+# {{ ansible_managed }}
+# TeamSpeak 3 语音服务器（UDP 语音 / TCP 查询+文件传输，数据落盘 ./data）
+services:
+  teamspeak:
+    image: {{ teamspeak_image }}
+    container_name: teamspeak
+    restart: always
+    ports:
+      - "{{ teamspeak_voice_port }}:{{ teamspeak_voice_port }}/udp"
+      - "{{ teamspeak_query_port }}:{{ teamspeak_query_port }}"
+      - "{{ teamspeak_filetransfer_port }}:{{ teamspeak_filetransfer_port }}"
+    volumes:
+      - ./data:/var/ts3server
+    environment:
+      TS3SERVER_LICENSE: accept
+{% if teamspeak_whitelist_ip | default('') %}
+      TS3SERVER_QUERY_IP_WHITELIST: "{{ teamspeak_whitelist_ip }}"
+{% endif %}

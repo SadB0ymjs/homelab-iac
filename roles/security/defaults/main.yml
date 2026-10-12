@@ -1,0 +1,55 @@
+---
+# security 角色可调参数
+# 优先级最低，会被 group_vars/all.yml 或 playbook 中的同名变量覆盖
+
+# ==================== sshd 加固 ====================
+# SSH 监听端口（inventory 里 ansible_port=10012，服务器本身已是这个端口，
+# 保持一致，避免 playbook 跑完后连不上）
+ssh_port: 22
+
+# 禁止 root 直接登录（prohibit-password：root 仅可用密钥登录，比 no 更稳妥，
+# 万一部署用户配置失败还有 root 密钥这条后路）
+security_ssh_permit_root_login: "prohibit-password"
+
+# 禁止密码认证，只允许密钥登录
+security_ssh_password_authentication: "no"
+
+# 禁止空密码
+security_ssh_permit_empty_passwords: "no"
+
+# 最多允许 3 次认证尝试
+security_ssh_max_auth_tries: 3
+
+# 空闲会话 300 秒无操作自动断开（server 每 60 秒发一次探测）
+security_ssh_client_alive_interval: 300
+security_ssh_client_alive_count_max: 1
+
+# 不允许 SSH 反向解析主机名（加快登录）
+security_ssh_use_dns: "no"
+
+# ==================== fail2ban ====================
+# SSH 登录失败 5 次封禁 1 小时
+security_fail2ban_max_retry: 5
+security_fail2ban_find_time: "10m"
+security_fail2ban_ban_time: "1h"
+
+# 封禁动作：iptables-multiport（默认动作，直接写 iptables 规则，不依赖 ufw）
+security_fail2ban_ban_action: "iptables-multiport"
+
+# 白名单：本机 + 内网段（可加入你常用的出口 IP，避免自己把自己封了）
+security_fail2ban_ignore_ip:
+  - "127.0.0.1/8"
+  - "::1"
+
+# ==================== 自动安全更新 ====================
+# 是否启用 unattended-upgrades 自动安装安全更新
+security_auto_upgrade_enabled: true
+
+# 自动更新同时自动移除无用的依赖包
+security_auto_upgrade_autoremove: true
+
+# 更新后需要重启时，自动重启（homelab 可接受；生产建议改 false 手动安排）
+security_auto_upgrade_automatic_reboot: true
+
+# 若开启自动重启，在凌晨 4 点执行
+security_auto_upgrade_reboot_time: "04:00"

@@ -1,0 +1,33 @@
+---
+# common 角色可调参数
+# 优先级最低，会被 group_vars/all.yml 或 playbook 中的同名变量覆盖
+
+# ---- 部署用户与系统基础 ----
+# 与 group_vars/all.yml 保持一致，这里作为角色独立运行时的兜底默认值
+deploy_user: ops
+timezone: Asia/Shanghai
+ssh_port: 22
+
+# 部署用户所属的附加组
+common_deploy_user_groups:
+  - sudo
+
+# 部署用户的登录 shell
+common_deploy_user_shell: /bin/bash
+
+# 给部署用户配置免密登录时，使用控制机上的这个公钥
+common_ssh_public_key_file: "~/.ssh/id_rsa.pub"
+
+# ---- 基础工具包 ----
+common_packages:
+  - curl
+  - wget
+  - vim
+  - git
+  - htop
+  - net-tools
+  - software-properties-common
+
+# ---- sudo ----
+# 是否给部署用户配置 sudo 免密（Ansible 执行 become 时无需输入密码）
+common_sudo_nopasswd: true

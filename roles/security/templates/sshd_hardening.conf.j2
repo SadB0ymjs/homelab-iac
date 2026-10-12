@@ -1,0 +1,14 @@
+# {{ ansible_managed }}
+# sshd 加固配置：放在 sshd_config.d 下且以 00- 开头，
+# 按字母序最先加载，后面的发行版默认片段无法覆盖它
+Port {{ ssh_port }}
+PermitRootLogin {{ security_ssh_permit_root_login }}
+PasswordAuthentication {{ security_ssh_password_authentication }}
+PermitEmptyPasswords {{ security_ssh_permit_empty_passwords }}
+MaxAuthTries {{ security_ssh_max_auth_tries }}
+ClientAliveInterval {{ security_ssh_client_alive_interval }}
+ClientAliveCountMax {{ security_ssh_client_alive_count_max }}
+UseDNS {{ security_ssh_use_dns }}
+X11Forwarding no
+AllowAgentForwarding no
+AllowTcpForwarding no

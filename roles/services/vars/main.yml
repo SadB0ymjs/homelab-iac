@@ -1,0 +1,6 @@
+---
+# services 角色内部常量
+# 优先级高于 defaults，不建议在外部覆盖
+
+# 各服务的 compose 项目目录（compose 文件与数据卷都在这里）
+services_teamspeak_dir: "{{ services_base_dir }}/teamspeak"

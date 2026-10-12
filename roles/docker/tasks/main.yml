@@ -1,0 +1,95 @@
+---
+# docker 角色：安装 Docker CE + Compose 插件，apt 源用阿里云镜像站
+# 执行顺序：前置依赖 → GPG key → apt 源 → 安装 → daemon.json → 用户组 → 启动 → 验证
+
+# 1. 安装前置依赖（https apt 源所需）
+- name: 安装 docker 前置依赖
+  apt:
+    name:
+      - ca-certificates
+      - curl
+      - gnupg
+    state: present
+    update_cache: yes
+    cache_valid_time: 3600
+
+# 2. 创建 keyrings 目录（新版 apt 的 GPG key 存放位置）
+- name: 创建 {{ docker_keyring_dir }} 目录
+  file:
+    path: "{{ docker_keyring_dir }}"
+    state: directory
+    mode: '0755'
+
+# 3. 下载阿里云镜像站的 Docker GPG key（.asc 格式，新版 apt 的 signed-by 直接支持，
+#    无需 gpg --dearmor 转换）
+- name: 下载 Docker GPG key（阿里云镜像站）
+  get_url:
+    url: "{{ docker_apt_gpg_key_url }}"
+    dest: "{{ docker_apt_keyring_path }}"
+    mode: '0644'
+  register: docker_gpg_result
+  until: docker_gpg_result is succeeded
+  retries: 3
+  delay: 5
+
+# 4. 添加阿里云的 docker-ce apt 软件源
+- name: 添加 docker apt 源（阿里云镜像站）
+  apt_repository:
+    repo: "{{ docker_apt_repository }}"
+    filename: docker-ce
+    state: present
+    update_cache: yes
+
+# 5. 安装 Docker CE 及相关组件（compose 以 plugin 形式安装，docker compose 命令可用）
+- name: 安装 Docker CE 及 docker-compose-plugin
+  apt:
+    name: "{{ docker_packages }}"
+    state: present
+    update_cache: yes
+    force: "{{ docker_allow_downgrade }}"
+
+# 6. 写入 daemon.json：国内镜像加速器 + 容器日志大小限制
+- name: 配置 daemon.json（镜像加速器 + 日志限制）
+  template:
+    src: daemon.json.j2
+    dest: "{{ docker_daemon_config_path }}"
+    owner: root
+    group: root
+    mode: '0644'
+  notify: 重启 docker
+
+# 7. 将部署用户加入 docker 组，免 sudo 使用 docker 命令
+- name: 将用户加入 docker 组
+  user:
+    name: "{{ item }}"
+    groups: "{{ docker_group }}"
+    append: yes
+  loop: "{{ docker_group_members }}"
+
+# 8. 启动并设置开机自启
+- name: 启动并启用 docker 服务
+  service:
+    name: "{{ docker_service_name }}"
+    state: "{{ docker_service_state }}"
+    enabled: "{{ docker_service_enabled }}"
+
+# 9. 刷新 handler 让 daemon.json 生效（放在最后，确保前面的 notify 都被执行）
+- name: 刷新所有 pending 的 handlers
+  meta: flush_handlers
+
+# 10. 验证安装：docker 与 compose 版本（失败则整个 play 报错）
+- name: 验证 docker 安装
+  command: docker version
+  changed_when: false
+  register: docker_version_output
+
+- name: 验证 docker compose 可用
+  command: docker compose version
+  changed_when: false
+  register: docker_compose_version_output
+
+- name: 显示安装结果
+  debug:
+    msg:
+      - "{{ docker_version_output.stdout_lines }}"
+      - "{{ docker_compose_version_output.stdout_lines }}"

@@ -1,0 +1,12 @@
+---
+# docker 角色内部常量
+# 优先级高于 defaults，不建议在外部覆盖
+
+# keyrings 目录（新版 apt 推荐的 GPG key 存放方式）
+docker_keyring_dir: /etc/apt/keyrings
+
+# daemon.json 的路径
+docker_daemon_config_path: /etc/docker/daemon.json
+
+# Debian 系 docker 组名（把用户加进这个组即可免 sudo 用 docker）
+docker_group: docker

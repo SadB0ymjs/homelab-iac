@@ -1,0 +1,50 @@
+---
+# docker 角色可调参数
+# 优先级最低，会被 group_vars/all.yml 或 playbook 中的同名变量覆盖
+
+# ---- apt 软件源（国内阿里云镜像站）----
+# Docker 官方 GPG key 的镜像地址
+docker_apt_gpg_key_url: "https://mirrors.aliyun.com/docker-ce/linux/ubuntu/gpg"
+
+# Docker CE apt 软件源（阿里云镜像站），{{ ansible_distribution_release }} 会替换成
+# focal / jammy 等 Ubuntu 版本代号
+docker_apt_repository: >
+  deb [arch=amd64 signed-by=/etc/apt/keyrings/docker.asc]
+  https://mirrors.aliyun.com/docker-ce/linux/ubuntu
+  {{ ansible_distribution_release }} stable
+
+# GPG key 存放路径（apt 源的 signed-by 指向这里，.asc 为 ASCII 格式，新版 apt 直接支持）
+docker_apt_keyring_path: /etc/apt/keyrings/docker.asc
+
+# ---- 安装内容 ----
+# 要安装的 Docker 相关包
+docker_packages:
+  - docker-ce
+  - docker-ce-cli
+  - containerd.io
+  - docker-buildx-plugin
+  - docker-compose-plugin
+
+# 允许降级安装（保持默认即可）
+docker_allow_downgrade: false
+
+# ---- Docker 服务 ----
+docker_service_name: docker
+docker_service_state: started
+docker_service_enabled: true
+
+# 将部署用户加入 docker 组（免 sudo 使用 docker 命令）
+docker_group_members:
+  - "{{ deploy_user | default('ops') }}"
+
+# ---- 镜像加速器 ----
+# Docker Hub 官方源国内拉取缓慢，配置阿里云个人加速器地址。
+# 注意：个人加速地址形如 https://<你的ID>.mirror.aliyuncs.com，
+# 需在阿里云「容器镜像服务 → 镜像加速器」页面获取，填到 group_vars 里覆盖此项
+docker_registry_mirrors:
+  - "https://docker.m.daocloud.io"
+
+# daemon.json 其他配置项（log 大小限制，避免日志撑爆磁盘）
+docker_log_driver: json-file
+docker_log_max_size: 50m
+docker_log_max_file: "3"
