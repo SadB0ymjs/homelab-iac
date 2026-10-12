@@ -20,7 +20,7 @@
 | 9 | 2026-10-12 | known_hosts 旧主机指纹残留 | NAT 换入口后同 IP:port 的主机密钥变了 | ✅ 已解决 |
 | 10 | 2026-10-12 | 重装后 REMOTE HOST IDENTIFICATION HAS CHANGED | 重装=新主机密钥，known_hosts 旧指纹冲突（#9 的真实触发） | ✅ 已解决 |
 | 11 | 2026-10-12 | 镜像拉取 502 Bad Gateway | 公共加速器 daocloud 高峰过载 | ✅ 已解决（多加速器冗余） |
-| 12 | 2026-10-12 | Load key "/dev/null": bad permissions | Ansible 连接参数异常（待验证 ControlMaster 残留 socket） | 🔍 待确认 |
+| 12 | 2026-10-12 | Load key "/dev/null": bad permissions | hosts.ini 曾加 `-i /dev/null` 纯密码 hack，公钥恢复后成路障 | ✅ 已解决 |
 
 ---
 
@@ -128,12 +128,17 @@
 - **预防**：任何第三方公共依赖（镜像源、DNS、apt 源）都要有 plan B；国内拉 Docker Hub 属于"常态不稳"，加速器冗余是标配而非可选。
 - **提交**：多加速器冗余配置
 
-## 12. Load key "/dev/null": bad permissions（待确认）
+## 12. Load key "/dev/null": bad permissions
 
-- **现象**：带 `-k` 跑完一轮（changed=23，死于 #11 的 502）后，不带 `-k` 再跑：`WARNING: UNPROTECTED PRIVATE KEY FILE! Permissions 0666 for '/dev/null' are too open` → `Permission denied (publickey,password)`。
-- **排查中**：ssh 客户端被要求加载 `/dev/null` 当私钥——`-i` 参数被空值/占位顶掉。嫌疑：Ansible 的 ControlMaster 复用 socket 残留（`/root/.ansible/cp/` 下指向已死会话的 socket），或 `-k` 模式下连接参数拼接异常。**待跑：`rm -rf /root/.ansible/cp` 清 socket 后重试不带 -k；`ls -la /root/.ssh/id_rsa` 确认钥匙存在。**
-- **预防**（暂定）：连不上时先清 ControlMaster socket 目录再下结论，避免把连接复用的残留当成新问题。
-- **状态**：🔍 待用户验证后补充结论
+- **现象**：不带 `-k` 跑 playbook：`WARNING: UNPROTECTED PRIVATE KEY FILE! Permissions 0666 for '/dev/null' are too open` → `Permission denied (publickey,password)`。带 `-k` 一切正常。
+- **排查链**：
+  1. 清 ControlMaster socket（`rm -rf /root/.ansible/cp`）重试 → 无效，排除连接复用残留
+  2. 系统层排查：`/etc/ssh/ssh_config` 无 IdentityFile（全是注释）、`~/.ssh/id_rsa` 权限 600 完美、环境变量无 ANSIBLE_* → 排除 A 机环境
+  3. **`ansible -m ping -vvv` 抓到现行**：ssh 命令行里赫然是 `-o IdentitiesOnly=yes -o IdentityFile=/dev/null` ——Ansible 亲自把空钥匙传给了 ssh
+  4. `grep /dev/null` 定位：hosts.ini 的 `ansible_ssh_common_args` 里被人加了 `-o IdentityFile=/dev/null`
+- **根因**：`-i /dev/null` 是一个知名 hack——强制 ssh 不加载任何真实密钥、做纯净密码认证（之前排查密码连接问题时写入）。临时 hack 没有恢复，等 B 机公钥通道修复后，它反而变成"只许用空钥匙"的路障：`IdentityFile=/dev/null` + `IdentitiesOnly=yes` 组合下任何真密钥都不被端出。
+- **解决**：hosts.ini 的 `ansible_ssh_common_args` 删掉 `-o IdentityFile=/dev/null`，保留 `-o IdentitiesOnly=yes`（配合 `ansible_ssh_private_key_file` 仍防多钥匙轮询）。
+- **预防**：临时 hack/排查用的配置改动，**当场加 TODO 注释标记用途与恢复条件**，用完即删；"排查时加的"和"常态配置"混在一起，后面的人（包括自己）无法分辨哪些是故意为之。另外 `-vvv` 是连接问题的终极武器——直接看 Ansible 拼出的完整 ssh 命令行，比猜一百次都快。
 
 ---
 
