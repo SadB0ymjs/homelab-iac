@@ -18,6 +18,9 @@
 | 7 | 2026-10-12 | assert 报 Conditional is marked as unsafe | jinja 套 jinja 嵌套 | ✅ 已解决 |
 | 8 | 2026-10-12 | 指定密钥仍要密码（免密终局） | sshd 的 PubkeyAuthentication 被外部配置关闭 | ✅ 已解决 |
 | 9 | 2026-10-12 | known_hosts 旧主机指纹残留 | NAT 换入口后同 IP:port 的主机密钥变了 | ✅ 已解决 |
+| 10 | 2026-10-12 | 重装后 REMOTE HOST IDENTIFICATION HAS CHANGED | 重装=新主机密钥，known_hosts 旧指纹冲突（#9 的真实触发） | ✅ 已解决 |
+| 11 | 2026-10-12 | 镜像拉取 502 Bad Gateway | 公共加速器 daocloud 高峰过载 | ✅ 已解决（多加速器冗余） |
+| 12 | 2026-10-12 | Load key "/dev/null": bad permissions | Ansible 连接参数异常（待验证 ControlMaster 残留 socket） | 🔍 待确认 |
 
 ---
 
@@ -105,6 +108,32 @@
   - NAT 漂移/目标机重装后，顺手 `-R` 清旧指纹再连（或直接删 known_hosts 对应行）
   - `[非默认端口]` 的条目在 known_hosts 里**必须带方括号**：`[ip]:port`，`-R` 时也要带，不带匹配不到
   - 生产环境别长期用 `StrictHostKeyChecking=no`，它是把这类警告静音的掩盖型配置；homelab 图省事可用，但要知道代价是放弃了主机身份校验
+
+---
+
+## 10. 重装系统后 REMOTE HOST IDENTIFICATION HAS CHANGED
+
+- **现象**：重装 B 机后跑 playbook，`@@@@@ WARNING: REMOTE HOST IDENTIFICATION HAS CHANGED! @@@@@`，且"Password authentication is disabled to avoid man-in-the-middle attacks"——密码也不让用了。
+- **排查**：这是 #9 的**真实触发**（上次是静默状态）：重装系统 = 机器生成了全新的 sshd 主机密钥，known_hosts 里 `[103.236.70.77]:10011` 缓存的还是旧机器指纹，ssh 按防中间人攻击处理，直接断连并禁用密码认证。
+- **根因**：主机身份标识（IP:port）没变，后面的机器换了。
+- **解决**：`ssh-keygen -f "/root/.ssh/known_hosts" -R "[103.236.70.77]:10011"`（输出显示旧条目在 line 6/7/8 共 3 条，全部清除）→ 重跑 `-k` 正常。
+- **预防**：**重装/换转发目标后必跑一次 `-R`**，这是固定动作。进阶：把主机指纹管理做进流程（如 `known_hosts` 随 IaC 更新），或接受 `StrictHostKeyChecking=no` 的代价。
+
+## 11. 镜像拉取 502 Bad Gateway
+
+- **现象**：重装后全新部署，TeamSpeak 镜像拉到一半：`docker.m.daocloud.io ... blobs/sha256:4f4fb... 502 Bad Gateway`，`up -d` 失败。
+- **排查**：502 出自**加速器服务端**（daocloud 代理 docker.io 的 blob 请求失败），不是网络不通——前面层都拉成功了，单个 blob 断流。公共免费加速器高峰期常态。
+- **根因**：daemon.json 只配了单个公共加速器，无冗余。
+- **解决**：重跑即可（pull 断点续传，502 是瞬时故障）；根治是 defaults 里 `docker_registry_mirrors` 配两个加速器按序回退（daocloud + 1ms.run），最稳是换成阿里云个人专属加速器地址（`https://<你的ID>.mirror.aliyuncs.com`，group_vars 覆盖）。
+- **预防**：任何第三方公共依赖（镜像源、DNS、apt 源）都要有 plan B；国内拉 Docker Hub 属于"常态不稳"，加速器冗余是标配而非可选。
+- **提交**：多加速器冗余配置
+
+## 12. Load key "/dev/null": bad permissions（待确认）
+
+- **现象**：带 `-k` 跑完一轮（changed=23，死于 #11 的 502）后，不带 `-k` 再跑：`WARNING: UNPROTECTED PRIVATE KEY FILE! Permissions 0666 for '/dev/null' are too open` → `Permission denied (publickey,password)`。
+- **排查中**：ssh 客户端被要求加载 `/dev/null` 当私钥——`-i` 参数被空值/占位顶掉。嫌疑：Ansible 的 ControlMaster 复用 socket 残留（`/root/.ansible/cp/` 下指向已死会话的 socket），或 `-k` 模式下连接参数拼接异常。**待跑：`rm -rf /root/.ansible/cp` 清 socket 后重试不带 -k；`ls -la /root/.ssh/id_rsa` 确认钥匙存在。**
+- **预防**（暂定）：连不上时先清 ControlMaster socket 目录再下结论，避免把连接复用的残留当成新问题。
+- **状态**：🔍 待用户验证后补充结论
 
 ---
 
