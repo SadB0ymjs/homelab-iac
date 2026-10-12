@@ -27,6 +27,15 @@
     key: "{{ lookup('file', common_ssh_public_key_file) }}"
     state: present
 
+# 4.1 同一把公钥也给 root 推一份：inventory 的 ansible_user=root 时，
+#     Ansible 自身和手动 ssh 都要靠 root 的密钥免密（不推的话 -k 密码一停就断）
+- name: 给 root 配置ssh公钥免密登录
+  authorized_key:
+    user: root
+    key: "{{ lookup('file', common_ssh_public_key_file) }}"
+    state: present
+  when: common_push_key_to_root | default(true)
+
 # 5. 设置系统时区
 - name: 设置系统时区为 {{ timezone }}
   timezone:
